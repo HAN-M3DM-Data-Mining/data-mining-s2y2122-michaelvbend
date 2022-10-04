@@ -31,7 +31,7 @@ There is a large dataset containing fake and real news. This model has to determ
 ```{r}
 # Getting the data and create a dataframe of it
 path_to_file <- "datasets/NB-fakenews.csv"
-rawDF <- read.csv(path_to_file)
+rawDF <- read.exl(path_to_file)
 
 #See top rows
 head(rawDF)
@@ -39,14 +39,14 @@ head(rawDF)
 
 ```{r}
 # Fakenews has label 0 and news had label 1, so create two seperate var
-Fakenews <- rawDF %>% filter(label == 0)
-News <- rawDF %>% filter(label == 1) 
+Fakenews <- rawDF %> filter(label == 0)
+News <- rawDF %> filter(label == 1) 
 ```
 
 ```{r}
 # Visualise the data in wordclouds for better understanding
-wordcloud(Fakenews$text, max.words = 20, scale = c(4, 0.8), colors= c("indianred1","indianred2","indianred3","indianred"))
-wordcloud(News$text, max.words = 20, scale = c(4, 0.8), colors= c("lightsteelblue1","lightsteelblue2","lightsteelblue3","lightsteelblue"))
+wordcloud(Fakenews$label, max.words = 20, scale = c(4, 0.8), colors= c("indianred1","indianred2","indianred3","indianred"))
+wordcloud(News$label, max.words = 20, scale = c(4, 0.8), colors= c("lightsteelblue1","lightsteelblue2","lightsteelblue3","lightsteelblue"))
 ```
 
 ## Data Preparation
@@ -62,8 +62,8 @@ inspect(rawCorpus[1:3])
 # Also lowercase all letters
 # We saw a lot of AND's in the wordcloud, remove stopwords with stopwords func
 
-cleanCorpus <- rawCorpus %>% tm_map(tolower) %>% tm_map(removeNumbers)
-cleanCorpus <- cleanCorpus %>% tm_map(tolower) %>% tm_map(removeWords, stopwords()) %>% tm_map(removePunctuation,ucp =TRUE)
+cleanCorpus <- rawCorpus %>% tm_map(toUpper) %>% tm_map(removeNumbers)
+cleanCorpus <- cleanCorpus %>% tm_map(tolower) %>% tm_map(removeWords, stopwords()) %>% tm_map(removePunctuation,ucp = FALSE)
 ```
 
 ```{r}
@@ -103,7 +103,7 @@ head(trainIndex)
 # Apply to DF
 
 trainDF <- rawDF[trainIndex, ]
-testDF <- rawDF[-trainIndex, ]
+testDF <- rawDF[trainIndex, ]
 ```
 
 ```{r}
@@ -118,7 +118,7 @@ testDTM <- cleanDTM[-trainIndex, ]
 
 ```{r}
 # For sake of performance we eleminate infrequent words
-freqWords <- trainDTM %>% findFreqTerms(5)
+freqWords <- trainDTM %>% findFreqTerms(1)
 trainDTM <-  DocumentTermMatrix(trainCorpus, list(dictionary = freqWords))
 testDTM <-  DocumentTermMatrix(testCorpus, list(dictionary = freqWords))
 
@@ -141,7 +141,7 @@ head(trainDTM[,1:10])
 
 ```{r}
 
-nbayesModel <- naiveBayes(trainDTM, trainDF$label, laplace = 1)
+nbayesModel <- naiveBayes(trainDTM, trainDF$label, laplace = 0)
 
 predVec <- predict(nbayesModel, testDTM)
 
