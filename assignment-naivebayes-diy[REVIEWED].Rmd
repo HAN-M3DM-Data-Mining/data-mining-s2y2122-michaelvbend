@@ -1,0 +1,162 @@
+---
+title: "Assigment - Naive Bayes DIY"
+author:
+  - Michael van der Bend - Author
+  - Jurre Foekens - Reviewer
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+   html_notebook:
+    toc: true
+    toc_depth: 2
+---
+
+```{r}
+library(tidyverse)
+library(tm)
+library(caret)
+library(wordcloud)
+library(e1071)
+```
+
+------------------------------------------------------------------------
+
+Choose a suitable dataset from [this](https://github.com/HAN-M3DM-Data-Mining/assignments/tree/master/datasets) folder and train your own Naive Bayes model. Follow all the steps from the CRISP-DM model.
+
+## Business Understanding
+
+There is a large dataset containing fake and real news. This model has to determine weither it's fake or not
+
+## Data Understanding
+
+```{r}
+# Getting the data and create a dataframe of it
+path_to_file <- "datasets/NB-fakenews.csv"
+rawDF <- read.exl(path_to_file)
+
+#See top rows
+head(rawDF)
+```
+
+```{r}
+# Fakenews has label 0 and news had label 1, so create two seperate var
+Fakenews <- rawDF %> filter(label == 0)
+News <- rawDF %> filter(label == 1) 
+```
+
+```{r}
+# Visualise the data in wordclouds for better understanding
+wordcloud(Fakenews$label, max.words = 20, scale = c(4, 0.8), colors= c("indianred1","indianred2","indianred3","indianred"))
+wordcloud(News$label, max.words = 20, scale = c(4, 0.8), colors= c("lightsteelblue1","lightsteelblue2","lightsteelblue3","lightsteelblue"))
+```
+
+## Data Preparation
+
+```{r}
+# Creation of a corpus of text documents (tm)
+rawCorpus <- Corpus(VectorSource(rawDF$text))
+inspect(rawCorpus[1:3])
+```
+
+```{r}
+# Remove elements which aren't relevant for model like numbers
+# Also lowercase all letters
+# We saw a lot of AND's in the wordcloud, remove stopwords with stopwords func
+
+cleanCorpus <- rawCorpus %>% tm_map(toUpper) %>% tm_map(removeNumbers)
+cleanCorpus <- cleanCorpus %>% tm_map(tolower) %>% tm_map(removeWords, stopwords()) %>% tm_map(removePunctuation,ucp = FALSE)
+```
+
+```{r}
+# Remove whitespaces
+
+cleanCorpus <- cleanCorpus %>% tm_map(stripWhitespace)
+
+```
+
+```{r}
+# Compare raw and Clean to make sure the text is clean
+
+tibble(Raw = rawCorpus$content[1:3], Clean = cleanCorpus$content[1:3])
+
+```
+
+```{r}
+# Create matrix from corpus
+
+cleanDTM <- cleanCorpus %>% DocumentTermMatrix
+inspect(cleanDTM)
+
+```
+
+```{r}
+# Split data in test dataset and training dataset
+
+set.seed(1234)
+trainIndex <- createDataPartition(rawDF$label, p = .75, 
+                                  list = FALSE, 
+                                  times = 1)
+head(trainIndex)
+
+```
+
+```{r}
+# Apply to DF
+
+trainDF <- rawDF[trainIndex, ]
+testDF <- rawDF[trainIndex, ]
+```
+
+```{r}
+# Apply split indices to Corpus
+trainCorpus <- cleanCorpus[trainIndex]
+testCorpus <- cleanCorpus[-trainIndex]
+
+# Apply split indices to DTM
+trainDTM <- cleanDTM[trainIndex, ]
+testDTM <- cleanDTM[-trainIndex, ]
+```
+
+```{r}
+# For sake of performance we eleminate infrequent words
+freqWords <- trainDTM %>% findFreqTerms(1)
+trainDTM <-  DocumentTermMatrix(trainCorpus, list(dictionary = freqWords))
+testDTM <-  DocumentTermMatrix(testCorpus, list(dictionary = freqWords))
+
+```
+
+```{r}
+# Transform counts into 'Boolean'
+convert_counts <- function(x) {
+  x <- ifelse(x > 0, 1, 0) %>% factor(levels = c(0,1), labels = c("No", "Yes"))
+}
+
+nColsDTM <- dim(trainDTM)[2]
+trainDTM <- apply(trainDTM, MARGIN = 2, convert_counts)
+testDTM <- apply(testDTM, MARGIN = 2, convert_counts)
+
+head(trainDTM[,1:10])
+
+```
+## Modeling
+
+```{r}
+
+nbayesModel <- naiveBayes(trainDTM, trainDF$label, laplace = 0)
+
+predVec <- predict(nbayesModel, testDTM)
+
+confusionMatrix(predVec, testDF$label, positive = "1", dnn = c("prediction", "true"))
+```
+## Evaluation and Deployment
+
+text and code here
+
+## reviewer adds suggestions for improving the model
+
+Error 1: Error in line 34, read.exl has to be read.csv
+Error 2 & 3: Error in line 42 & 43, %> has to be %>%
+Error 4: Error in line 48, Fakenews$label has to be Fakenews$text
+Error 5: Error in line 49, News$label has to be News$text
+Error 6: Error in line 66, removePunctuation,ucp = FALSE needs to be TRUE
+Error 7: Error in line 121, findFreqTerms(1) needs to be findFreqTerms(5)
+Error 8: Error in line 144, laplace = 0 needs to be laplace = 1
